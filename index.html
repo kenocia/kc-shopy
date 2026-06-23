@@ -243,6 +243,16 @@ FROM [LS_172_20_11_69].[SBO_VAN_HEUSEN].[dbo].[@ARGNS_COLOR]</pre>
         <h4>Degradación sin traducción</h4>
         <p>Si el código de color no tiene fila en <span class="mono">@ARGNS_COLOR</span>, la variante se sincroniza igual pero sin Color como opción visible — queda solo con Talla. No se bloquea la sincronización completa por un color sin traducir.</p>
       </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Regla 5</span>
+        <h4>Variantes dinámicas: no todo modelo lleva Color</h4>
+        <p>Confirmado con Van Heusen: existen modelos <strong>solo-Talla</strong> (sin variantes de color reales, ej. accesorios) junto a modelos Talla+Color. El addon detecta el caso sin campo nuevo: si <span class="mono">U_ARGNS_COL</span> viene vacío/nulo para todos los ItemCode de un Modelo, ese producto se arma con <span class="mono">productOptions = [Talla]</span> únicamente — nunca se fuerza una opción Color vacía.</p>
+      </div>
+    </div>
+
+    <div class="callout callout-warning">
+      <span class="callout-icon">!</span>
+      <p><strong>Pendiente de confirmar con Van Heusen:</strong> ¿puede un mismo Modelo mezclar ItemCode con color y sin color al mismo tiempo (algunos variantes con <span class="mono">U_ARGNS_COL</span> lleno y otras vacío dentro del mismo Modelo), o la regla "solo-Talla vs Talla+Color" siempre aplica a nivel de Modelo completo? El pseudocódigo (sección 09) asume esto último — que la decisión se toma una vez por Modelo, no por variante individual.</p>
     </div>
   </section>
 
@@ -273,6 +283,7 @@ FROM [LS_172_20_11_69].[SBO_VAN_HEUSEN].[dbo].[@ARGNS_COLOR]</pre>
           <tr><td class="mono">OITW</td><td class="mono">OnHand</td><td>Stock físico, filtrado <span class="mono">WhsCode = 'A01'</span></td></tr>
           <tr><td class="mono">OITW</td><td class="mono">IsCommited</td><td>Stock comprometido — se resta del físico (ver fórmula abajo)</td></tr>
           <tr><td class="mono">@ARGNS_COLOR</td><td class="mono">Code, Name</td><td>Traducción código→nombre comercial de color (sección 1-2)</td></tr>
+          <tr><td class="mono">OITM</td><td class="mono">U_Traductor</td><td>Resuelve la categoría del producto en Shopify (<span class="mono">productCategory</span> / collection)</td></tr>
         </tbody>
       </table>
     </div>
@@ -284,6 +295,7 @@ FROM [LS_172_20_11_69].[SBO_VAN_HEUSEN].[dbo].[@ARGNS_COLOR]</pre>
     T0.U_ARGNS_MOD   AS Modelo,
     T0.U_ARGNS_COL   AS CodigoColor,
     T0.U_argns_size  AS Talla,
+    T0.U_Traductor   AS CategoriaShopify,
     T0.U_ShopifyStatus,
     T1.Price         AS PrecioLista02,
     T2.OnHand        AS StockFisico,
@@ -364,6 +376,7 @@ WHERE T0.U_ARGNS_MOD = @modelo</pre>
       <pre class="code-block">mutation {
   productSet(input: {
     title: "BF5CACC06 — Blazer Dress Solido"
+    category: "{resuelto de U_Traductor}"   # ej. gid://shopify/TaxonomyCategory/aa-1
     metafields: [
       { namespace: "custom", key: "sap_modelo", value: "BF5CACC06", type: "single_line_text_field" }
     ]
@@ -413,6 +426,11 @@ WHERE T0.U_ARGNS_MOD = @modelo</pre>
         <span class="rule-card-tag">Pendiente</span>
         <h4>Ubicación de inventario (<span class="mono">locationId</span>)</h4>
         <p>El payload de ejemplo asume una sola ubicación de inventario en Shopify mapeada al almacén <span class="mono">A01</span> de SAP. Confirmar con Gilberto si Van Heusen tiene más de una ubicación activa en Shopify antes de fijar este valor como constante.</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Categoría</span>
+        <h4>U_Traductor → categoría de Shopify</h4>
+        <p><span class="mono">U_Traductor</span> en SAP resuelve la categoría del producto en Shopify (campo <span class="mono">category</span> de la taxonomía estándar, o una collection — pendiente confirmar cuál de las dos usa el resto del addon). Se lee en el mismo Paso 1 que Color y Talla; no requiere una consulta aparte.</p>
       </div>
     </div>
   </section>
@@ -487,7 +505,7 @@ WHERE T0.U_ARGNS_MOD = @modelo</pre>
       </div>
       <pre class="code-block">PASO 1 — Leer todas las variantes del modelo desde SAP (Service Layer)
   variantes = SELECT ItemCode, U_ARGNS_MOD, U_ARGNS_COL, U_argns_size,
-                     U_ShopifyStatus, Precio (ITM1, Lista 02),
+                     U_Traductor, U_ShopifyStatus, Precio (ITM1, Lista 02),
                      OnHand, IsCommited, (OnHand - IsCommited) AS Disponible
               FROM OITM + ITM1 + OITW
               WHERE U_ARGNS_MOD = {modelo} AND OITW.WhsCode = 'A01'
@@ -519,11 +537,15 @@ PASO 5 — Reconciliar contra Shopify (sección 06)
       ir a PASO 6B (actualizar producto existente)
 
 PASO 6A — Crear producto padre completo (sección 07)
+  SI todos los U_ARGNS_COL del modelo vienen vacíos:    (Regla 5 — solo-Talla)
+      productOptions = [Talla]
+  SINO:
+      productOptions = [Color, Talla]
   armar payload productSet con:
       title, metafield sap_modelo = {modelo}
-      productOptions = [Color, Talla]
-      variants = una entrada por cada combinación Color×Talla
-                 que sobrevivió Pasos 2-4, con:
+      category = U_Traductor resuelto
+      productOptions (definido arriba)
+      variants = una entrada por cada combinación que sobrevivió Pasos 2-4, con:
                      sku = ItemCode EXACTO (sección 08 — sin transformar)
                      price = Precio
                      inventoryQuantities = Disponible
@@ -588,6 +610,16 @@ PASO 7 — Confirmar en SAP
             <td class="mono">TC-06</td>
             <td>Búsqueda de imagen para un color sin foto propia en S3</td>
             <td>Documentar como pendiente — no cubierto por esta especificación; confirmar fallback con Gilberto</td>
+          </tr>
+          <tr>
+            <td class="mono">TC-07</td>
+            <td>Modelo con todos sus ItemCode sin U_ARGNS_COL (accesorio solo-Talla)</td>
+            <td>Producto creado con productOptions = [Talla] únicamente, sin opción Color (Regla 5)</td>
+          </tr>
+          <tr>
+            <td class="mono">TC-08</td>
+            <td>Modelo con algunos ItemCode con color y otros sin color (mezcla dentro del mismo modelo)</td>
+            <td>Pendiente — comportamiento no definido aún; confirmar con Van Heusen antes de codificar este caso</td>
           </tr>
         </tbody>
       </table>

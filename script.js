@@ -84,6 +84,29 @@ imagen = buscar en bucket S3 por prefijo_busqueda`,
         },
       },
       {
+        title: "Detectar si el modelo lleva Color",
+        tag: "Regla 5",
+        summary: "Si U_ARGNS_COL viene vacío en todo el modelo, las opciones son solo Talla.",
+        detail: {
+          ref: "Sección 04 — Regla 5",
+          body: `<p>Confirmado con Van Heusen: existen modelos solo-Talla (ej. accesorios) junto a modelos Talla+Color. No hay campo nuevo — se infiere de <span class="mono">U_ARGNS_COL</span> vacío.</p>
+                 <p><strong>Pendiente de confirmar:</strong> si un mismo Modelo puede mezclar ItemCode con y sin color, o la regla siempre aplica a nivel de Modelo completo.</p>`,
+          code: `SI todos los U_ARGNS_COL del modelo vienen vacíos:
+    productOptions = [Talla]
+SINO:
+    productOptions = [Color, Talla]`,
+        },
+      },
+      {
+        title: "Resolver categoría (U_Traductor)",
+        tag: "Categoría",
+        summary: "U_Traductor se lee junto con Color y Talla — no requiere consulta aparte.",
+        detail: {
+          ref: "Sección 07 — Categoría",
+          body: `<p><span class="mono">U_Traductor</span> en SAP resuelve la categoría del producto en Shopify. Pendiente confirmar si se mapea al campo <span class="mono">category</span> de la taxonomía estándar o a una collection.</p>`,
+        },
+      },
+      {
         title: "Reconciliar contra Shopify",
         tag: "Sección 06",
         summary: "Buscar por metafield custom.sap_modelo antes de decidir crear o actualizar.",
