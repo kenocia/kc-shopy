@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Keno-Shopy · Especificación — Mapeo de Color (@ARGNS_COLOR)</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">KS</span>
+      <span class="brand-text">Keno&#8209;Shopy</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-doc">Especificación técnica · Mapeo de Color</span>
+    </div>
+    <nav class="topnav">
+      <a href="#fuente">Fuente</a>
+      <a href="#mapeo">Mapeo</a>
+      <a href="#calidad">Calidad de datos</a>
+      <a href="#arquitectura">Arquitectura</a>
+      <a href="#sap-lectura">Lectura SAP</a>
+      <a href="#reconciliacion">Reconciliación</a>
+      <a href="#shopify-escritura">Escritura Shopify</a>
+      <a href="#sku-control">Control SKU</a>
+      <a href="#pseudocodigo">Pseudocódigo</a>
+      <a href="#pruebas">Casos de prueba</a>
+      <a href="#tablero">Tablero de trabajo</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Especificación de implementación · Para: Jefree Gómez / Gilberto Salguero</p>
+      <h1>Lookup de color contra<br><span class="mono">@ARGNS_COLOR</span></h1>
+      <p class="hero-sub">
+        Esta especificación cierra el diseño del Proceso&nbsp;2 bajo el Alcance&nbsp;B
+        (color como variante real). Documenta la fuente de datos en SAP, la regla de
+        mapeo código→familia→nombre comercial, los casos de calidad de datos a manejar,
+        y el contrato exacto que debe cumplir el lookup dentro del addon.
+      </p>
+      <div class="hero-meta">
+        <div class="meta-item">
+          <span class="meta-label">Deriva de</span>
+          <span class="meta-value">Decisión de arquitectura · Alcance B</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Tabla SAP</span>
+          <span class="meta-value mono">@ARGNS_COLOR</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Consume</span>
+          <span class="meta-value">Proceso 2 · lookup en vivo</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FUENTE -->
+  <section class="section" id="fuente">
+    <div class="section-head">
+      <p class="eyebrow">01 — Fuente de datos</p>
+      <h2>La consulta real contra SAP.</h2>
+      <p class="section-intro">
+        El código de color por sí solo no es legible para el cliente final. SAP expone
+        su traducción a nombre comercial en la tabla de usuario <span class="mono">@ARGNS_COLOR</span>.
+      </p>
+    </div>
+
+    <div class="code-panel">
+      <div class="code-panel-head">
+        <span class="code-panel-label">SQL · SAP Business One</span>
+      </div>
+      <pre class="code-block">SELECT TOP 100 *
+FROM [LS_172_20_11_69].[SBO_VAN_HEUSEN].[dbo].[@ARGNS_COLOR]</pre>
+    </div>
+
+    <p class="result-caption">Resultado de ejemplo (columnas relevantes, datos reales de Van Heusen):</p>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Code</th><th>Name</th><th>Familia (regla de rango)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">000</td><td>Blanco</td><td>Blanco</td></tr>
+          <tr><td class="mono">001</td><td>Amarillo</td><td>Amarillo</td></tr>
+          <tr><td class="mono">100</td><td>Rojo</td><td>Rojo</td></tr>
+          <tr><td class="mono">200</td><td>Naranja</td><td>Naranja</td></tr>
+          <tr><td class="mono">500</td><td>Navy</td><td>Azul</td></tr>
+          <tr><td class="mono">600</td><td>Verde</td><td>Verde</td></tr>
+          <tr><td class="mono">730</td><td>Café</td><td>Marrón</td></tr>
+          <tr><td class="mono">ACI</td><td>Azul Cielo</td><td>Azul (alfanumérico)</td></tr>
+          <tr><td class="mono">ZIC</td><td>Gris Claro</td><td>Negro/Gris (alfanumérico)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">i</span>
+      <p><strong>Corrección sobre el análisis previo:</strong> el ejemplo "730 → Navy" usado en el documento de decisión de arquitectura no es exacto. Contra datos reales, <span class="mono">730</span> corresponde a <strong>"Café"</strong>; <span class="mono">500</span> es el código real de <strong>"Navy"</strong>. Este documento usa únicamente valores verificados contra <span class="mono">@ARGNS_COLOR</span>.</p>
+    </div>
+  </section>
+
+  <!-- MAPEO -->
+  <section class="section section-dark" id="mapeo">
+    <div class="section-head">
+      <p class="eyebrow">02 — Regla de mapeo</p>
+      <h2>Dos niveles: familia y nombre comercial.</h2>
+      <p class="section-intro">
+        El código no es arbitrario — el primer dígito (o prefijo, en códigos alfanuméricos)
+        determina la familia de color. Dentro de cada familia, el código completo resuelve
+        el nombre comercial específico que ve el cliente final.
+      </p>
+    </div>
+
+    <div class="family-grid">
+      <div class="family-chip"><span class="family-range">000</span>Blanco</div>
+      <div class="family-chip"><span class="family-range">0xx</span>Amarillo</div>
+      <div class="family-chip"><span class="family-range">1xx</span>Rojo</div>
+      <div class="family-chip"><span class="family-range">2xx</span>Naranja</div>
+      <div class="family-chip"><span class="family-range">3xx</span>Rosa</div>
+      <div class="family-chip"><span class="family-range">4xx</span>Morado</div>
+      <div class="family-chip"><span class="family-range">5xx</span>Azul</div>
+      <div class="family-chip"><span class="family-range">6xx</span>Verde</div>
+      <div class="family-chip"><span class="family-range">7xx</span>Marrón</div>
+      <div class="family-chip"><span class="family-range">8xx</span>Negro / Gris</div>
+    </div>
+
+    <p class="result-caption">Resolución en dos pasos, con ejemplos reales:</p>
+
+    <div class="flow-steps">
+      <div class="flow-step">
+        <span class="flow-step-num">1</span>
+        <div>
+          <h4>Familia por rango del código</h4>
+          <p><span class="mono">730</span> → primer dígito <span class="mono">7</span> → familia <strong>Marrón</strong></p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <span class="flow-step-num">2</span>
+        <div>
+          <h4>Nombre comercial por código exacto</h4>
+          <p><span class="mono">730</span> → fila exacta en <span class="mono">@ARGNS_COLOR</span> → <strong>"Café"</strong></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="principle-box">
+      <span class="principle-label">Por qué importan los dos niveles</span>
+      <p>El nombre comercial (paso 2) es lo único que se envía a Shopify como opción de variante. La familia (paso 1) no se expone al cliente — sirve como agrupador interno opcional para QA y para detectar códigos fuera de rango durante las pruebas.</p>
+    </div>
+  </section>
+
+  <!-- CALIDAD DE DATOS -->
+  <section class="section" id="calidad">
+    <div class="section-head">
+      <p class="eyebrow">03 — Calidad de datos</p>
+      <h2>3 códigos con nombre en conflicto.</h2>
+      <p class="section-intro">
+        Sobre 1,153 filas verificadas en el archivo de pantones de referencia, 3 códigos
+        numéricos tienen más de un nombre comercial asociado. El resto de las repeticiones
+        encontradas son filas idénticas (mismo código, mismo nombre), sin conflicto real.
+      </p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table data-table-conflict">
+        <thead>
+          <tr><th>Code</th><th>Nombres encontrados</th><th>Regla de resolución</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">760</td><td>"Café" / "Kaki"</td><td class="status-conflict">Primer registro por ID</td></tr>
+          <tr><td class="mono">780</td><td>"Café" / "Kaki"</td><td class="status-conflict">Primer registro por ID</td></tr>
+          <tr><td class="mono">790</td><td>"Beige" / "Kaki"</td><td class="status-conflict">Primer registro por ID</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-warning">
+      <span class="callout-icon">!</span>
+      <p><strong>Regla de resolución confirmada:</strong> ante un código con más de un nombre en <span class="mono">@ARGNS_COLOR</span>, el lookup toma el primer registro encontrado (menor ID / orden de inserción) y descarta los siguientes. No se requiere intervención manual para que el addon siga funcionando — pero estos 3 códigos quedan marcados para que Van Heusen los depure en el origen cuando pueda.</p>
+    </div>
+  </section>
+
+  <!-- ARQUITECTURA -->
+  <section class="section section-dark" id="arquitectura">
+    <div class="section-head">
+      <p class="eyebrow">04 — Arquitectura de armado del padre</p>
+      <h2>Solo lo que tiene stock real.</h2>
+      <p class="section-intro">
+        El padre se construye con SAP como única fuente de verdad — la API de Shopify
+        nunca decide qué variantes existen, solo recibe lo que el addon ya resolvió.
+      </p>
+    </div>
+
+    <div class="arch-diagram">
+      <div class="arch-box arch-source">
+        <span class="arch-box-label">SAP B1</span>
+        <span class="arch-box-title">Data pura</span>
+        <span class="arch-box-detail">ItemCode, Modelo, Color, Talla, Precio (Lista 02), Stock (OITW)</span>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box arch-transform">
+        <span class="arch-box-label">Addon</span>
+        <span class="arch-box-title">Filtrado + traducción</span>
+        <span class="arch-box-detail">Omite color sin stock · resuelve nombre via @ARGNS_COLOR</span>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box arch-target">
+        <span class="arch-box-label">Shopify</span>
+        <span class="arch-box-title">Padre + variantes</span>
+        <span class="arch-box-detail">Modelo = producto · Color×Talla = variante · SKU = ItemCode</span>
+      </div>
+    </div>
+
+    <div class="rule-grid">
+      <div class="rule-card">
+        <span class="rule-card-tag">Regla 1</span>
+        <h4>Imágenes por Modelo + Color</h4>
+        <p>La búsqueda en Amazon S3 usa el prefijo <span class="mono">Modelo+Color</span> — no solo Modelo. Cada color tiene su propia sesión de fotos; agrupar solo por Modelo mostraría la imagen incorrecta en colores que no son el principal.</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Regla 2</span>
+        <h4>Omisión por color sin stock</h4>
+        <p>Si un color no tiene stock disponible en <strong>ninguna</strong> de sus tallas, ese color se omite por completo del padre. No se expone como variante deshabilitada — simplemente no existe en el payload enviado a Shopify.</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Regla 3</span>
+        <h4>Tallas asimétricas por color</h4>
+        <p>No todos los colores tienen las mismas tallas. El padre debe exponer únicamente las combinaciones Color×Talla que existen y tienen stock — nunca generar el producto cartesiano completo de todos los colores por todas las tallas.</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Regla 4</span>
+        <h4>Degradación sin traducción</h4>
+        <p>Si el código de color no tiene fila en <span class="mono">@ARGNS_COLOR</span>, la variante se sincroniza igual pero sin Color como opción visible — queda solo con Talla. No se bloquea la sincronización completa por un color sin traducir.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PSEUDOCÓDIGO -->
+  <section class="section" id="sap-lectura">
+    <div class="section-head">
+      <p class="eyebrow">05 — Cómo se toma en SAP</p>
+      <h2>Qué se lee, de dónde, y con qué llave.</h2>
+      <p class="section-intro">
+        Todo el ciclo arranca con una lectura completa por Modelo — nunca por variante
+        aislada. Leer una sola variante sin su grupo completo es la causa raíz del bug
+        original (productos duplicados) que motivó este rediseño.
+      </p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Tabla SAP</th><th>Campo</th><th>Rol en el ciclo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">OITM</td><td class="mono">ItemCode</td><td>SKU exacto de la variante en Shopify (ver sección 08)</td></tr>
+          <tr><td class="mono">OITM</td><td class="mono">U_ARGNS_MOD</td><td>Identifica el Modelo → es la clave del producto padre</td></tr>
+          <tr><td class="mono">OITM</td><td class="mono">U_ARGNS_COL</td><td>Código de color → resuelto a nombre vía @ARGNS_COLOR (sección 2)</td></tr>
+          <tr><td class="mono">OITM</td><td class="mono">U_argns_size</td><td>Talla → segunda opción de variante</td></tr>
+          <tr><td class="mono">OITM</td><td class="mono">U_ShopifyStatus</td><td>Bandera de sincronización pendiente/hecho (significado completo: ver documento de análisis funcional, pendiente #02)</td></tr>
+          <tr><td class="mono">ITM1</td><td>Lista de Precios 02</td><td>Precio de venta de la variante</td></tr>
+          <tr><td class="mono">OITW</td><td class="mono">OnHand</td><td>Stock físico, filtrado <span class="mono">WhsCode = 'A01'</span></td></tr>
+          <tr><td class="mono">OITW</td><td class="mono">IsCommited</td><td>Stock comprometido — se resta del físico (ver fórmula abajo)</td></tr>
+          <tr><td class="mono">@ARGNS_COLOR</td><td class="mono">Code, Name</td><td>Traducción código→nombre comercial de color (sección 1-2)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="code-panel">
+      <div class="code-panel-head"><span class="code-panel-label">SQL · Lectura completa de un Modelo (vía Service Layer / SQL directo)</span></div>
+      <pre class="code-block">SELECT
+    T0.ItemCode,
+    T0.U_ARGNS_MOD   AS Modelo,
+    T0.U_ARGNS_COL   AS CodigoColor,
+    T0.U_argns_size  AS Talla,
+    T0.U_ShopifyStatus,
+    T1.Price         AS PrecioLista02,
+    T2.OnHand        AS StockFisico,
+    T2.IsCommited    AS StockComprometido,
+    (T2.OnHand - T2.IsCommited) AS Disponible
+FROM OITM T0
+LEFT JOIN ITM1 T1 ON T1.ItemCode = T0.ItemCode AND T1.PriceList = 2
+LEFT JOIN OITW T2 ON T2.ItemCode = T0.ItemCode AND T2.WhsCode = 'A01'
+WHERE T0.U_ARGNS_MOD = @modelo</pre>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">i</span>
+      <p><strong>Por qué se lee por Modelo completo y no por ItemCode aislado:</strong> el addon necesita ver todas las variantes (todos los colores y tallas) de un Modelo en la misma operación de lectura, antes de decidir qué color sobrevive (Regla 2, stock total) y qué tallas expone cada color (Regla 3). Leer ItemCode por ItemCode de forma aislada no permite aplicar ninguna de las dos reglas — es la causa estructural del bug original (productos duplicados) que originó este rediseño completo.</p>
+    </div>
+  </section>
+
+  <!-- RECONCILIACIÓN -->
+  <section class="section section-dark" id="reconciliacion">
+    <div class="section-head">
+      <p class="eyebrow">06 — Reconciliación contra Shopify</p>
+      <h2>¿Crear producto nuevo, o actualizar uno existente?</h2>
+      <p class="section-intro">
+        Como SAP no guarda el Shopify Product ID (el padre se identifica por Modelo,
+        no por un ID externo cacheado), cada corrida debe <strong>preguntarle a Shopify</strong>
+        si el producto de ese Modelo ya existe, antes de decidir.
+      </p>
+    </div>
+
+    <div class="callout callout-warning">
+      <span class="callout-icon">!</span>
+      <p><strong>Decisión técnica recomendada, pendiente de validar con el equipo:</strong> ya que no hay Shopify Product ID cacheado en SAP, el Modelo debe quedar guardado en Shopify como un <strong>metafield</strong> propio del producto (ej. <span class="mono">custom.sap_modelo</span>), y la reconciliación se hace consultando ese metafield — no por handle ni por título, que pueden cambiar por edición manual en Shopify sin que SAP se entere.</p>
+    </div>
+
+    <div class="flow-steps">
+      <div class="flow-step">
+        <span class="flow-step-num">1</span>
+        <div>
+          <h4>Buscar producto existente por metafield de Modelo</h4>
+          <p>Query GraphQL <span class="mono">products(query: "metafield:custom.sap_modelo:{modelo}")</span> — si devuelve resultado, el padre ya existe y se sigue el camino de <strong>actualización</strong>.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <span class="flow-step-num">2</span>
+        <div>
+          <h4>Si no existe — crear producto padre completo</h4>
+          <p>Se crea el producto con todas las variantes que sobrevivieron las Reglas 2 y 3 en la misma operación (ver sección 07). El metafield de Modelo se escribe en esta misma llamada.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <span class="flow-step-num">3</span>
+        <div>
+          <h4>Si existe — diferenciar variantes nuevas vs. existentes</h4>
+          <p>Comparar el conjunto de SKU (ItemCode) que SAP entrega contra los SKU que Shopify ya tiene en ese producto. Los que están en SAP pero no en Shopify → agregar. Los que están en ambos → actualizar precio/stock. Los que están en Shopify pero ya no en SAP con stock → evaluar regla de Draft/Archived (pendiente #03 del análisis funcional).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESCRITURA SHOPIFY -->
+  <section class="section" id="shopify-escritura">
+    <div class="section-head">
+      <p class="eyebrow">07 — Cómo se arma para Shopify</p>
+      <h2>Un producto, todas sus variantes, una sola llamada.</h2>
+      <p class="section-intro">
+        Mecanismo de API recomendado para la creación inicial del padre completo —
+        pendiente de confirmar contra la versión de API que ya use el resto del addon.
+      </p>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">i</span>
+      <p><strong>Recomendación técnica:</strong> usar la mutación GraphQL <span class="mono">productSet</span> (Admin API 2024-01+), que crea o reemplaza un producto completo — título, opciones, variantes y precios — en una sola llamada idempotente. Es preferible sobre encadenar <span class="mono">productCreate</span> + <span class="mono">productVariantsBulkCreate</span> por separado, porque reduce el riesgo de que el producto quede creado sin variantes si la segunda llamada falla a mitad de la sincronización.</p>
+    </div>
+
+    <div class="code-panel">
+      <div class="code-panel-head"><span class="code-panel-label">GraphQL · productSet — payload de ejemplo (Modelo BF5CACC06)</span></div>
+      <pre class="code-block">mutation {
+  productSet(input: {
+    title: "BF5CACC06 — Blazer Dress Solido"
+    metafields: [
+      { namespace: "custom", key: "sap_modelo", value: "BF5CACC06", type: "single_line_text_field" }
+    ]
+    productOptions: [
+      { name: "Color", values: [{ name: "Navy" }, { name: "Café" }] },
+      { name: "Talla", values: [{ name: "S" }, { name: "M" }, { name: "L" }] }
+    ]
+    variants: [
+      {
+        sku: "BF5CACC06-500-S"
+        optionValues: [{ optionName: "Color", name: "Navy" }, { optionName: "Talla", name: "S" }]
+        price: "716.00"
+        inventoryQuantities: [{ availableQuantity: 2, locationId: "..." }]
+      },
+      {
+        sku: "BF5CACC06-500-M"
+        optionValues: [{ optionName: "Color", name: "Navy" }, { optionName: "Talla", name: "M" }]
+        price: "716.00"
+        inventoryQuantities: [{ availableQuantity: 3, locationId: "..." }]
+      }
+      // ... una entrada por cada combinación Color×Talla que sobrevivió Reglas 2 y 3
+    ]
+  }) {
+    product { id }
+    userErrors { field message }
+  }
+}</pre>
+    </div>
+
+    <div class="rule-grid">
+      <div class="rule-card">
+        <span class="rule-card-tag">Creación</span>
+        <h4>Producto nuevo (no existía el Modelo)</h4>
+        <p><span class="mono">productSet</span> con todas las variantes sobrevivientes en el mismo arreglo. El metafield <span class="mono">sap_modelo</span> se escribe en esta misma llamada — sin eso, la reconciliación de la sección 06 no tiene nada contra qué buscar la próxima vez.</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Actualización</span>
+        <h4>Producto existente — variantes nuevas</h4>
+        <p><span class="mono">productVariantsBulkCreate</span> únicamente para los SKU que SAP entrega y Shopify aún no tiene. No se vuelve a enviar el producto completo — solo las variantes faltantes.</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Actualización</span>
+        <h4>Producto existente — variantes que ya existen</h4>
+        <p><span class="mono">productVariantsBulkUpdate</span> (precio) + mutación de <span class="mono">inventorySetQuantities</span> (stock) por separado — son dos recursos distintos en la API de Shopify, no se actualizan en la misma llamada.</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Pendiente</span>
+        <h4>Ubicación de inventario (<span class="mono">locationId</span>)</h4>
+        <p>El payload de ejemplo asume una sola ubicación de inventario en Shopify mapeada al almacén <span class="mono">A01</span> de SAP. Confirmar con Gilberto si Van Heusen tiene más de una ubicación activa en Shopify antes de fijar este valor como constante.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTROL DE SKU -->
+  <section class="section section-dark" id="sku-control">
+    <div class="section-head">
+      <p class="eyebrow">08 — El control crítico: SKU = ItemCode</p>
+      <h2>La única llave que importa después de creado el producto.</h2>
+      <p class="section-intro">
+        Una vez que el padre y sus variantes existen en Shopify, <strong>todo el resto del ciclo de vida</strong>
+        — actualizar precio, actualizar stock — depende de una sola cosa: que el campo
+        <span class="mono">sku</span> de la variante en Shopify sea idéntico, carácter por carácter,
+        al <span class="mono">ItemCode</span> de SAP.
+      </p>
+    </div>
+
+    <div class="arch-diagram">
+      <div class="arch-box arch-source">
+        <span class="arch-box-label">SAP</span>
+        <span class="arch-box-title mono">ItemCode</span>
+        <span class="arch-box-detail">Ej. BF5CACC06-500-S — generado por SAP, nunca por el addon</span>
+      </div>
+      <div class="arch-arrow">=</div>
+      <div class="arch-box arch-target">
+        <span class="arch-box-label">Shopify</span>
+        <span class="arch-box-title mono">variant.sku</span>
+        <span class="arch-box-detail">Debe coincidir exactamente — es la llave de cruce para siempre</span>
+      </div>
+    </div>
+
+    <p class="result-caption">Por qué este control es más importante que cualquier otra regla del documento:</p>
+
+    <div class="rule-grid">
+      <div class="rule-card">
+        <span class="rule-card-tag">Riesgo</span>
+        <h4>Shopify autogenera sufijo si el SKU llega vacío o duplicado</h4>
+        <p>Si el payload de creación no envía <span class="mono">sku</span> explícito en cada variante, o envía el mismo valor dos veces en la misma llamada, Shopify le agrega un sufijo automático (<span class="mono">-1</span>, <span class="mono">-2</span>...). Esto ya se documentó como causa de bug en el análisis funcional (pendiente #04) — el control de este documento es la forma de prevenirlo desde el origen, no solo detectarlo después.</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Validación obligatoria</span>
+        <h4>Unicidad garantizada por construcción, no por casualidad</h4>
+        <p>Como el ItemCode ya es <span class="mono">Modelo-Color-Talla</span> y SAP no permite dos artículos con el mismo ItemCode, la unicidad del SKU dentro de un mismo producto está garantizada <strong>si y solo si</strong> el payload nunca transforma, recorta o normaliza el ItemCode antes de enviarlo como SKU.</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Ciclo de actualización</span>
+        <h4>Precio y stock se actualizan SIEMPRE por SKU, nunca por nombre de variante</h4>
+        <p>El lookup para actualizar precio/stock (Proceso 2) debe buscar la variante en Shopify por <span class="mono">sku = ItemCode</span> exacto — nunca por la combinación de nombres de Color/Talla, que puede ambigüarse si dos colores resuelven al mismo nombre comercial (ver sección 3, códigos 760/780/790).</p>
+      </div>
+      <div class="rule-card">
+        <span class="rule-card-tag">Caso límite</span>
+        <h4>¿Qué pasa si alguien edita el SKU manualmente en Shopify?</h4>
+        <p>Pendiente de definir con el equipo: si un usuario de Shopify cambia el SKU a mano, el siguiente ciclo de sincronización no va a encontrar coincidencia y probablemente cree una variante duplicada. Recomendado: agregar una validación de integridad que alerte (no que corrija solo) si el conteo de variantes esperadas vs. encontradas por SKU no coincide.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PSEUDOCÓDIGO -->
+  <section class="section" id="pseudocodigo">
+    <div class="section-head">
+      <p class="eyebrow">09 — Contrato de implementación</p>
+      <h2>El ciclo completo, paso a paso.</h2>
+      <p class="section-intro">
+        Desde la lectura en SAP hasta el envío a Shopify — el orden de estos pasos
+        no es intercambiable. Cada paso depende del resultado del anterior.
+      </p>
+    </div>
+
+    <div class="code-panel">
+      <div class="code-panel-head">
+        <span class="code-panel-label">Pseudocódigo · Ciclo completo SAP → Shopify por Modelo</span>
+      </div>
+      <pre class="code-block">PASO 1 — Leer todas las variantes del modelo desde SAP (Service Layer)
+  variantes = SELECT ItemCode, U_ARGNS_MOD, U_ARGNS_COL, U_argns_size,
+                     U_ShopifyStatus, Precio (ITM1, Lista 02),
+                     OnHand, IsCommited, (OnHand - IsCommited) AS Disponible
+              FROM OITM + ITM1 + OITW
+              WHERE U_ARGNS_MOD = {modelo} AND OITW.WhsCode = 'A01'
+
+PASO 2 — Agrupar por color y calcular stock total del color
+  Para cada color distinto en variantes:
+      stock_total_color = SUMA(Disponible) de todas las tallas de ese color
+      SI stock_total_color == 0:
+          DESCARTAR este color por completo (Regla 2)
+          continuar con el siguiente color
+
+PASO 3 — Resolver nombre comercial del color (lookup en vivo)
+  Para cada color que sobrevivió el Paso 2:
+      fila = SELECT TOP 1 Name FROM @ARGNS_COLOR
+             WHERE Code = {codigo_color}
+             ORDER BY {ID o campo de orden de inserción}
+      SI fila existe:  nombre_color = fila.Name
+      SINO:            nombre_color = NULL   (Regla 4: sin opción Color visible)
+
+PASO 4 — Resolver imagen del color (Amazon S3)
+  prefijo_busqueda = Modelo + "-" + codigo_color     (Regla 1)
+  imagen = buscar en bucket S3 por prefijo_busqueda
+
+PASO 5 — Reconciliar contra Shopify (sección 06)
+  resultado = buscar producto en Shopify por metafield custom.sap_modelo = {modelo}
+  SI resultado es vacío:
+      ir a PASO 6A (crear producto nuevo)
+  SINO:
+      ir a PASO 6B (actualizar producto existente)
+
+PASO 6A — Crear producto padre completo (sección 07)
+  armar payload productSet con:
+      title, metafield sap_modelo = {modelo}
+      productOptions = [Color, Talla]
+      variants = una entrada por cada combinación Color×Talla
+                 que sobrevivió Pasos 2-4, con:
+                     sku = ItemCode EXACTO (sección 08 — sin transformar)
+                     price = Precio
+                     inventoryQuantities = Disponible
+  enviar productSet a Shopify
+
+PASO 6B — Actualizar producto existente
+  sku_sap = conjunto de ItemCode resueltos en Pasos 2-4
+  sku_shopify = conjunto de SKU que el producto ya tiene en Shopify
+  nuevos = sku_sap - sku_shopify        → productVariantsBulkCreate
+  existentes = sku_sap ∩ sku_shopify    → productVariantsBulkUpdate (precio)
+                                         → inventorySetQuantities (stock)
+  faltantes = sku_shopify - sku_sap     → evaluar regla Draft/Archived
+                                           (pendiente #03, análisis funcional)
+
+PASO 7 — Confirmar en SAP
+  SI Pasos 6A/6B respondieron sin userErrors:
+      actualizar U_ShopifyStatus de cada ItemCode procesado
+  SINO:
+      registrar error para reintento — no marcar como sincronizado</pre>
+    </div>
+  </section>
+
+  <!-- CASOS DE PRUEBA -->
+  <section class="section" id="pruebas">
+    <div class="section-head">
+      <p class="eyebrow">10 — Casos de prueba</p>
+      <h2>Para validar antes de producción.</h2>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Caso</th><th>Entrada</th><th>Resultado esperado</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">TC-01</td>
+            <td>Color con código en @ARGNS_COLOR y stock &gt; 0 en al menos una talla</td>
+            <td>Color aparece con nombre comercial correcto y solo sus tallas con stock</td>
+          </tr>
+          <tr>
+            <td class="mono">TC-02</td>
+            <td>Color con stock = 0 en todas sus tallas</td>
+            <td>Color completamente omitido del payload (Regla 2)</td>
+          </tr>
+          <tr>
+            <td class="mono">TC-03</td>
+            <td>Código de color sin fila en @ARGNS_COLOR</td>
+            <td>Variante sincronizada sin opción Color, solo Talla (Regla 4)</td>
+          </tr>
+          <tr>
+            <td class="mono">TC-04</td>
+            <td>Código 760, 780 o 790 (nombre conflictivo)</td>
+            <td>Se usa el primer registro por ID; no se bloquea ni se duplica</td>
+          </tr>
+          <tr>
+            <td class="mono">TC-05</td>
+            <td>Modelo con colores que tienen distintas tallas disponibles entre sí</td>
+            <td>Cada color expone solo sus propias tallas — sin producto cartesiano completo</td>
+          </tr>
+          <tr>
+            <td class="mono">TC-06</td>
+            <td>Búsqueda de imagen para un color sin foto propia en S3</td>
+            <td>Documentar como pendiente — no cubierto por esta especificación; confirmar fallback con Gilberto</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- TABLERO DE TRABAJO -->
+  <section class="section section-dark" id="tablero">
+    <div class="section-head">
+      <p class="eyebrow">11 — Tablero de trabajo</p>
+      <h2>Las 4 etapas, de SAP a Shopify.</h2>
+      <p class="section-intro">
+        Vista de implementación del ciclo descrito en las secciones 05-09. Toca cualquier
+        tarjeta para ver su query, payload o regla exacta — todo el detalle ya está
+        documentado arriba; esto es el mapa de ejecución.
+      </p>
+    </div>
+
+    <div class="kanban" id="kanban"></div>
+    <div class="kanban-detail" id="kanban-detail" hidden></div>
+
+    <div class="gantt-head">
+      <p class="eyebrow">Cronograma de implementación · Alcance B</p>
+      <h3>11 días hábiles · SAP + Addon/Shopify</h3>
+    </div>
+    <div class="gantt" id="impl-gantt"></div>
+  </section>
+
+</main>
+
+<footer class="quote-footer">
+  <div class="quote-footer-inner">
+    <span>Lumo by Kenocia</span>
+    <span class="mono">Especificación técnica · Keno-Shopy</span>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
