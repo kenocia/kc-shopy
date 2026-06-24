@@ -11,6 +11,7 @@ Repositorio independiente, tercer sitio de la serie Keno-Shopy. Dirigido al equi
 
 ## Contenido
 
+0. **Cómo funciona el addon, en simple** — simulación interactiva con clic para avanzar, usando un producto real (BS6CACSXC, Camisa Oxford). 6 pasos: cómo viven los ItemCode en SAP sin jerarquía, cómo el addon los agrupa por Modelo, cómo se descarta lo que no tiene stock, cómo nace el producto padre en Shopify, cómo cada variante (hijo) lleva su propio precio y stock, y cómo lo ve finalmente el cliente en la tienda. Pensada para que el equipo entienda la mecánica sin leer SQL ni GraphQL.
 1. **Fuente de datos** — la consulta SQL real contra `@ARGNS_COLOR` y un resultado de ejemplo con datos verificados (no inventados) de Van Heusen.
 2. **Regla de mapeo** — cómo se resuelve familia (por rango de código) y nombre comercial (por código exacto).
 3. **Calidad de datos** — los 3 códigos con nombre en conflicto (760, 780, 790) y la regla de resolución por defecto.

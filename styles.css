@@ -438,3 +438,164 @@ body {
   .gantt-scale { margin-left: 140px; }
   .gantt-row-label { font-size: 11.5px; }
 }
+
+/* ============================================================
+   Simulación interactiva — cómo funciona el addon
+   ============================================================ */
+.sim-stage {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-base);
+  padding: 32px 28px;
+  min-height: 360px;
+}
+
+.sim-step-head { margin-bottom: 24px; }
+.sim-step-head h3 { font-family: var(--font-display); font-size: 19px; margin: 0 0 6px; color: var(--accent); }
+.sim-step-head p { font-size: 14px; color: var(--text-mid); margin: 0; max-width: 600px; }
+
+.sim-note {
+  margin-top: 20px;
+  font-size: 13.5px;
+  color: var(--text-mid);
+  border-left: 2px solid var(--accent-dim);
+  padding-left: 14px;
+}
+.sim-note .mono { color: var(--text-hi); }
+
+.sim-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+}
+.sim-btn {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  border: 1px solid var(--accent-dim);
+  background: var(--accent-glow);
+  color: var(--accent);
+  padding: 10px 18px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.sim-btn:hover { background: rgba(110,155,244,0.26); }
+.sim-btn:disabled { opacity: 0.35; cursor: default; }
+.sim-progress { display: flex; gap: 7px; }
+.sim-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.sim-dot.is-done { background: var(--accent-dim); }
+.sim-dot.is-active { background: var(--accent); }
+
+/* Paso 1-2: grid plano de ItemCode */
+.sim-flat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+.sim-flat-item {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sim-flat-sku { font-family: var(--font-mono); font-size: 12px; color: var(--text-hi); }
+.sim-flat-meta { font-size: 11px; color: var(--text-low); }
+
+.sim-model-box {
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius);
+  background: var(--accent-glow);
+  padding: 20px;
+}
+.sim-model-label { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--text-low); text-transform: uppercase; margin-bottom: 4px; }
+.sim-model-name { display: block; font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 16px; }
+.sim-flat-grid-grouped .sim-flat-item { background: var(--bg-base); }
+
+/* Paso 3: grupos de color con stock */
+.sim-color-groups { display: flex; flex-direction: column; gap: 12px; }
+.sim-color-group {
+  border: 1px solid var(--cyan-dim);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  padding: 14px 16px;
+  transition: opacity 0.3s ease;
+}
+.sim-color-group-dead { border-color: var(--risk); opacity: 0.45; }
+.sim-color-group-head { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 10px; }
+.sim-color-swatch { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--line); display: inline-block; flex-shrink: 0; }
+.sim-color-status { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--cyan); }
+.sim-color-group-dead .sim-color-status { color: var(--risk); }
+.sim-color-group-items { display: flex; gap: 8px; flex-wrap: wrap; }
+.sim-chip {
+  font-family: var(--font-mono); font-size: 11.5px; padding: 4px 10px;
+  border-radius: 100px; background: var(--bg-base); border: 1px solid var(--line); color: var(--text-mid);
+}
+.sim-chip-zero { color: var(--risk); border-color: rgba(232,116,74,0.3); }
+
+/* Paso 4: producto padre */
+.sim-product-card {
+  border: 1px solid var(--cyan-dim);
+  border-radius: var(--radius);
+  background: linear-gradient(160deg, var(--cyan-glow), transparent 60%), var(--bg-panel);
+  padding: 22px;
+}
+.sim-product-label { font-family: var(--font-mono); font-size: 11px; color: var(--cyan); text-transform: uppercase; }
+.sim-product-head h4 { font-family: var(--font-display); font-size: 18px; margin: 6px 0 18px; }
+.sim-option-label { display: block; font-size: 12px; color: var(--text-low); margin-bottom: 8px; }
+.sim-option-values { display: flex; gap: 10px; flex-wrap: wrap; }
+.sim-swatch-pill {
+  display: inline-flex; align-items: center; gap: 7px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: 100px; padding: 6px 12px 6px 8px; background: var(--bg-base);
+}
+.sim-swatch-pill.is-selected { border-color: var(--accent); color: var(--accent); }
+
+/* Paso 5: tarjetas de variante */
+.sim-variant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.sim-variant-card {
+  display: flex; flex-direction: column; gap: 6px; text-align: left;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel);
+  padding: 14px; cursor: pointer; font-family: inherit; color: var(--text-hi);
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.sim-variant-card * { color: inherit; }
+.sim-variant-card:hover { transform: translateY(-2px); border-color: var(--accent-dim); }
+.sim-variant-card.is-flipped { border-color: var(--accent); background: var(--accent-glow); }
+.sim-variant-sku { font-size: 12.5px; margin-bottom: 4px; }
+.sim-variant-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-low); }
+.sim-variant-row strong { color: var(--text-hi); font-weight: 500; }
+
+/* Paso 6: storefront simulado */
+.sim-storefront { display: flex; justify-content: center; }
+.sim-storefront-card {
+  display: flex; gap: 24px; max-width: 520px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-panel); padding: 22px;
+}
+.sim-storefront-image {
+  width: 110px; height: 110px; border-radius: 8px; background: var(--bg-panel-2);
+  display: flex; align-items: center; justify-content: center; font-size: 38px; flex-shrink: 0;
+}
+.sim-storefront-info h4 { font-family: var(--font-display); font-size: 16px; margin: 0 0 6px; }
+.sim-storefront-price { font-family: var(--font-mono); color: var(--accent); font-size: 15px; margin: 0 0 16px; }
+.sim-storefront-group { margin-bottom: 14px; }
+.sim-storefront-label { display: block; font-size: 11.5px; color: var(--text-low); margin-bottom: 6px; }
+.sim-storefront-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.sim-size-pill {
+  font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 11px; background: var(--bg-base); color: var(--text-mid);
+}
+.sim-size-pill.is-selected { border-color: var(--accent); color: var(--accent); }
+.sim-storefront-btn {
+  width: 100%; margin-top: 6px; border: none; border-radius: 7px; padding: 10px;
+  background: var(--accent); color: #07101F; font-family: var(--font-display); font-weight: 600;
+  font-size: 13px; cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .sim-storefront-card { flex-direction: column; }
+  .sim-controls { flex-wrap: wrap; }
+}

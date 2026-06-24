@@ -1,6 +1,238 @@
 // ============================================================
-// KENO-SHOPY — Especificación técnica — Tablero de trabajo
+// SIMULACIÓN INTERACTIVA — cómo funciona el addon, paso a paso
+// Ejemplo real: BS6CACSXC (Camisa Oxford Casual Solida), verificado
+// contra datos de Van Heusen el 23/06/2026.
 // ============================================================
+
+// Universo simplificado del modelo para la simulación (subconjunto real)
+const SIM_ITEMS = [
+  { sku: "BS6CACSXC-000-XLGE", color: "000", colorNombre: "(sin capturar)", talla: "XLGE", disponible: 0 },
+  { sku: "BS6CACSXC-000-XXL",  color: "000", colorNombre: "(sin capturar)", talla: "XXL",  disponible: 0 },
+  { sku: "BS6CACSXC-000-LGE",  color: "000", colorNombre: "Blanco",        talla: "LGE",  precio: "L 540.00", disponible: 6 },
+  { sku: "BS6CACSXC-000-MED",  color: "000", colorNombre: "Blanco",        talla: "MED",  precio: "L 540.00", disponible: 4 },
+  { sku: "BS6CACSXC-160-LGE",  color: "160", colorNombre: "Roja",          talla: "LGE",  precio: "L 540.00", disponible: 3 },
+  { sku: "BS6CACSXC-160-MED",  color: "160", colorNombre: "Roja",          talla: "MED",  precio: "L 540.00", disponible: 0 },
+  { sku: "BS6CACSXC-380-LGE",  color: "380", colorNombre: "Rosado Claro",  talla: "LGE",  precio: "L 540.00", disponible: 5 },
+  { sku: "BS6CACSXC-380-XLGE", color: "380", colorNombre: "Rosado Claro",  talla: "XLGE", precio: "L 540.00", disponible: 2 },
+  { sku: "BS6CACSXC-570-LGE",  color: "570", colorNombre: "Azul Claro",    talla: "LGE",  precio: "L 540.00", disponible: 0 },
+  { sku: "BS6CACSXC-570-MED",  color: "570", colorNombre: "Azul Claro",    talla: "MED",  precio: "L 540.00", disponible: 0 },
+];
+
+function simColorGroups(items) {
+  const groups = {};
+  items.forEach((it) => {
+    if (!groups[it.color]) groups[it.color] = { color: it.color, nombre: it.colorNombre, items: [] };
+    groups[it.color].items.push(it);
+  });
+  return Object.values(groups);
+}
+
+function simColorTieneStock(group) {
+  return group.items.some((it) => (it.disponible || 0) > 0);
+}
+
+const SIM_STEPS = [
+  {
+    title: "1 · Así vive en SAP",
+    caption: "ItemCode planos en OITM — sin jerarquía, cada talla y color es una fila suelta.",
+    render: () => `
+      <div class="sim-flat-grid">
+        ${SIM_ITEMS.map(
+          (it) => `
+          <div class="sim-flat-item">
+            <span class="sim-flat-sku">${it.sku}</span>
+            <span class="sim-flat-meta">Color ${it.color} · Talla ${it.talla}</span>
+          </div>`
+        ).join("")}
+      </div>
+      <p class="sim-note">10 ItemCode reales del modelo <span class="mono">BS6CACSXC</span>. SAP no sabe que estos pertenecen al mismo "producto" — para SAP son artículos independientes.</p>
+    `,
+  },
+  {
+    title: "2 · El addon los agrupa por Modelo",
+    caption: "U_ARGNS_MOD = BS6CACSXC es la clave — todos estos ItemCode son el mismo Modelo.",
+    render: () => `
+      <div class="sim-model-box">
+        <span class="sim-model-label">Modelo</span>
+        <span class="sim-model-name mono">BS6CACSXC</span>
+        <div class="sim-flat-grid sim-flat-grid-grouped">
+          ${SIM_ITEMS.map(
+            (it) => `<div class="sim-flat-item sim-flat-item-grouped"><span class="sim-flat-sku">${it.sku}</span></div>`
+          ).join("")}
+        </div>
+      </div>
+      <p class="sim-note">El addon lee TODO el modelo de una sola vez — nunca un ItemCode aislado. Esto es lo que permite decidir, en el siguiente paso, qué sobrevive y qué no.</p>
+    `,
+  },
+  {
+    title: "3 · Se descarta lo que no tiene stock",
+    caption: "Si un color no tiene disponible en ninguna talla, ese color desaparece del producto.",
+    render: () => {
+      const groups = simColorGroups(SIM_ITEMS);
+      return `
+        <div class="sim-color-groups">
+          ${groups
+            .map((g) => {
+              const vivo = simColorTieneStock(g);
+              return `
+              <div class="sim-color-group ${vivo ? "" : "sim-color-group-dead"}">
+                <div class="sim-color-group-head">
+                  <span class="sim-color-swatch" style="background:${simSwatchColor(g.color)}"></span>
+                  <span>${g.nombre}</span>
+                  <span class="sim-color-status">${vivo ? "✓ se conserva" : "✕ se descarta — sin stock"}</span>
+                </div>
+                <div class="sim-color-group-items">
+                  ${g.items
+                    .map((it) => `<span class="sim-chip ${it.disponible > 0 ? "" : "sim-chip-zero"}">${it.talla}: ${it.disponible ?? "—"}</span>`)
+                    .join("")}
+                </div>
+              </div>`;
+            })
+            .join("")}
+        </div>
+        <p class="sim-note">Azul Claro (570) se descarta completo — sus 2 tallas están en 0. Roja (160) se conserva porque al menos una talla (LGE) sí tiene stock, aunque MED esté en 0.</p>
+      `;
+    },
+  },
+  {
+    title: "4 · Nace el producto padre",
+    caption: "Un producto en Shopify, con los colores sobrevivientes como variantes.",
+    render: () => {
+      const groups = simColorGroups(SIM_ITEMS).filter(simColorTieneStock);
+      return `
+        <div class="sim-product-card">
+          <div class="sim-product-head">
+            <span class="sim-product-label">Producto Shopify</span>
+            <h4>BS6CACSXC — Camisa Oxford Casual Solida</h4>
+          </div>
+          <div class="sim-product-options">
+            <span class="sim-option-label">Color</span>
+            <div class="sim-option-values">
+              ${groups.map((g) => `<span class="sim-swatch-pill"><span class="sim-color-swatch" style="background:${simSwatchColor(g.color)}"></span>${g.nombre}</span>`).join("")}
+            </div>
+          </div>
+        </div>
+        <p class="sim-note">El Modelo completo <span class="mono">BS6CACSXC</span> es UN producto en Shopify. Sin esta agrupación, cada color aparecería como una ficha separada — el problema original que motivó este rediseño.</p>
+      `;
+    },
+  },
+  {
+    title: "5 · Cada hijo lleva su propio precio y stock",
+    caption: "El SKU de la variante es el ItemCode exacto — toca una para ver su detalle.",
+    render: () => {
+      const vivos = SIM_ITEMS.filter((it) => (it.disponible || 0) > 0);
+      return `
+        <div class="sim-variant-grid">
+          ${vivos
+            .map(
+              (it, i) => `
+            <button type="button" class="sim-variant-card" data-idx="${i}">
+              <span class="sim-variant-sku mono">${it.sku}</span>
+              <span class="sim-variant-row"><span>Color</span><strong>${it.colorNombre}</strong></span>
+              <span class="sim-variant-row"><span>Talla</span><strong>${it.talla}</strong></span>
+              <span class="sim-variant-row"><span>Precio</span><strong>${it.precio}</strong></span>
+              <span class="sim-variant-row"><span>Stock</span><strong>${it.disponible}</strong></span>
+            </button>`
+            )
+            .join("")}
+        </div>
+        <p class="sim-note">Cada tarjeta es independiente: su propio precio, su propio stock. Si Blanco-LGE se agota, solo esa tarjeta cambia — el resto del producto sigue intacto.</p>
+      `;
+    },
+  },
+  {
+    title: "6 · Así lo ve el cliente final",
+    caption: "Una sola ficha de producto, con selector de color y talla.",
+    render: () => `
+      <div class="sim-storefront">
+        <div class="sim-storefront-card">
+          <div class="sim-storefront-image">📦</div>
+          <div class="sim-storefront-info">
+            <h4>Camisa Oxford Casual Solida</h4>
+            <p class="sim-storefront-price">L 540.00</p>
+            <div class="sim-storefront-group">
+              <span class="sim-storefront-label">Color</span>
+              <div class="sim-storefront-swatches">
+                <span class="sim-swatch-pill is-selected"><span class="sim-color-swatch" style="background:${simSwatchColor("000")}"></span>Blanco</span>
+                <span class="sim-swatch-pill"><span class="sim-color-swatch" style="background:${simSwatchColor("160")}"></span>Roja</span>
+                <span class="sim-swatch-pill"><span class="sim-color-swatch" style="background:${simSwatchColor("380")}"></span>Rosado Claro</span>
+              </div>
+            </div>
+            <div class="sim-storefront-group">
+              <span class="sim-storefront-label">Talla</span>
+              <div class="sim-storefront-swatches">
+                <span class="sim-size-pill is-selected">LGE</span>
+                <span class="sim-size-pill">MED</span>
+              </div>
+            </div>
+            <button type="button" class="sim-storefront-btn">Agregar al carrito</button>
+          </div>
+        </div>
+      </div>
+      <p class="sim-note">Una sola ficha. El cliente elige color y talla sin saber que detrás hay 10 ItemCode distintos en SAP — eso es exactamente lo que el addon resuelve por él.</p>
+    `,
+  },
+];
+
+function simSwatchColor(code) {
+  const map = { "000": "#F2F0EA", "160": "#C0392B", "380": "#F0B8C8", "570": "#5E9BD6" };
+  return map[code] || "#888";
+}
+
+let simCurrentStep = 0;
+
+function renderSimStep() {
+  const stage = document.getElementById("sim-stage");
+  const progress = document.getElementById("sim-progress");
+  const prevBtn = document.getElementById("sim-prev");
+  const nextBtn = document.getElementById("sim-next");
+  if (!stage) return;
+
+  const step = SIM_STEPS[simCurrentStep];
+  stage.innerHTML = `
+    <div class="sim-step-head">
+      <h3>${step.title}</h3>
+      <p>${step.caption}</p>
+    </div>
+    <div class="sim-step-body">${step.render()}</div>
+  `;
+
+  progress.innerHTML = SIM_STEPS.map((_, i) => `<span class="sim-dot ${i === simCurrentStep ? "is-active" : ""} ${i < simCurrentStep ? "is-done" : ""}"></span>`).join("");
+
+  prevBtn.disabled = simCurrentStep === 0;
+  nextBtn.textContent = simCurrentStep === SIM_STEPS.length - 1 ? "Reiniciar ↺" : "Siguiente paso →";
+
+  // tarjetas de variante interactivas (paso 5)
+  stage.querySelectorAll(".sim-variant-card").forEach((card) => {
+    card.addEventListener("click", () => card.classList.toggle("is-flipped"));
+  });
+}
+
+function initSimulacion() {
+  const prevBtn = document.getElementById("sim-prev");
+  const nextBtn = document.getElementById("sim-next");
+  if (!prevBtn || !nextBtn) return;
+
+  prevBtn.addEventListener("click", () => {
+    if (simCurrentStep > 0) {
+      simCurrentStep -= 1;
+      renderSimStep();
+    }
+  });
+
+  nextBtn.addEventListener("click", () => {
+    if (simCurrentStep < SIM_STEPS.length - 1) {
+      simCurrentStep += 1;
+    } else {
+      simCurrentStep = 0;
+    }
+    renderSimStep();
+  });
+
+  renderSimStep();
+}
+
+
 
 const KANBAN = [
   {
@@ -347,6 +579,7 @@ function renderImplGantt() {
 // Init
 // ------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
+  initSimulacion();
   renderKanban();
   renderImplGantt();
 });
