@@ -250,9 +250,37 @@ FROM [LS_172_20_11_69].[SBO_VAN_HEUSEN].[dbo].[@ARGNS_COLOR]</pre>
       </div>
     </div>
 
+    <p class="result-caption">Evidencia verificada contra datos reales de Van Heusen — 17 modelos detectados con esta consulta:</p>
+
+    <div class="code-panel">
+      <div class="code-panel-head"><span class="code-panel-label">SQL · Detección de modelos con mezcla con/sin color</span></div>
+      <pre class="code-block">SELECT U_ARGNS_MOD,
+       COUNT(DISTINCT U_ARGNS_COL) AS colores_distintos,
+       SUM(CASE WHEN U_ARGNS_COL IS NULL OR U_ARGNS_COL = '' THEN 1 ELSE 0 END) AS items_sin_color,
+       SUM(CASE WHEN U_ARGNS_COL IS NOT NULL AND U_ARGNS_COL != '' THEN 1 ELSE 0 END) AS items_con_color
+FROM OITM
+GROUP BY U_ARGNS_MOD
+HAVING SUM(CASE WHEN U_ARGNS_COL IS NULL OR U_ARGNS_COL = '' THEN 1 ELSE 0 END) > 0
+   AND SUM(CASE WHEN U_ARGNS_COL IS NOT NULL AND U_ARGNS_COL != '' THEN 1 ELSE 0 END) > 0</pre>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Modelo</th><th>Descripción</th><th>Caso</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">BM4CTIE01</td><td>Corbatín Black Label Estampado Moda</td><td>Solo-Talla real — talla única (<span class="mono">UNI</span>), sin dimensión de color</td></tr>
+          <tr><td class="mono">CRG06</td><td>Cinta China Reflectiva Silver/Lime</td><td>Sin talla ni color — ItemCode plano, producto sin variantes</td></tr>
+          <tr><td class="mono">ZA1029</td><td>Calzado Van Vien Borcegui Intrepid Negro</td><td>Solo-Talla real — tallas 46/47, color único no capturado en campo</td></tr>
+          <tr><td class="mono">ST0POCSP1</td><td>Camisa Tipo Polo Premium Pique Solida Blanca</td><td>Probable dato incompleto — tiene tallas normales (LGE-XXL) pero color vacío en los 6 ItemCode</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <div class="callout callout-warning">
       <span class="callout-icon">!</span>
-      <p><strong>Pendiente de confirmar con Van Heusen:</strong> ¿puede un mismo Modelo mezclar ItemCode con color y sin color al mismo tiempo (algunos variantes con <span class="mono">U_ARGNS_COL</span> lleno y otras vacío dentro del mismo Modelo), o la regla "solo-Talla vs Talla+Color" siempre aplica a nivel de Modelo completo? El pseudocódigo (sección 09) asume esto último — que la decisión se toma una vez por Modelo, no por variante individual.</p>
+      <p><strong>Parcialmente resuelto:</strong> sí existen modelos con mezcla de ItemCode con y sin color (17 detectados con el query de arriba). En el caso inspeccionado (BS6CACSXC), los 2 ItemCode "sin color" resultaron ser <strong>el mismo color (000) sin capturar en el campo</strong> — no una variante distinta — y además tienen stock 0 en A01, por lo que la Regla 2 los descarta de todos modos sin necesidad de resolver esta ambigüedad primero. <strong>Pregunta más precisa que queda pendiente para Van Heusen:</strong> en los modelos donde la mezcla SÍ tiene stock real (no es el caso de BS6CACSXC, pero podría serlo en otro de los 17), ¿el ItemCode sin color debe tratarse como variante "sin opción Color" dentro del mismo producto, o es siempre un dato a corregir en origen antes de sincronizar? El pseudocódigo (sección 09) por ahora asume que la decisión solo-Talla/Talla+Color se toma una vez por Modelo completo, no por variante individual — válido para los 4 casos limpios de la tabla, pendiente de validar si hay un modelo con stock real en ambos lados de la mezcla.</p>
     </div>
   </section>
 
@@ -618,8 +646,13 @@ PASO 7 — Confirmar en SAP
           </tr>
           <tr>
             <td class="mono">TC-08</td>
-            <td>Modelo con algunos ItemCode con color y otros sin color (mezcla dentro del mismo modelo)</td>
-            <td>Pendiente — comportamiento no definido aún; confirmar con Van Heusen antes de codificar este caso</td>
+            <td>Modelo con mezcla ItemCode con/sin color, pero el "sin color" tiene stock 0 (caso BS6CACSXC, verificado)</td>
+            <td>El ItemCode sin color es descartado por Regla 2 (stock 0) — no llega a generar ambigüedad de opciones</td>
+          </tr>
+          <tr>
+            <td class="mono">TC-09</td>
+            <td>Modelo con mezcla ItemCode con/sin color, donde el "sin color" SÍ tiene stock &gt; 0</td>
+            <td>Pendiente — no verificado en los 17 modelos detectados hasta ahora; confirmar con Van Heusen si aparece</td>
           </tr>
         </tbody>
       </table>

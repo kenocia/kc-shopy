@@ -90,7 +90,7 @@ imagen = buscar en bucket S3 por prefijo_busqueda`,
         detail: {
           ref: "Sección 04 — Regla 5",
           body: `<p>Confirmado con Van Heusen: existen modelos solo-Talla (ej. accesorios) junto a modelos Talla+Color. No hay campo nuevo — se infiere de <span class="mono">U_ARGNS_COL</span> vacío.</p>
-                 <p><strong>Pendiente de confirmar:</strong> si un mismo Modelo puede mezclar ItemCode con y sin color, o la regla siempre aplica a nivel de Modelo completo.</p>`,
+                 <p><strong>Verificado con datos reales:</strong> 17 modelos tienen mezcla con/sin color. En el caso inspeccionado (BS6CACSXC), el "sin color" resultó ser el mismo color sin capturar, con stock 0 — la Regla 2 lo descarta antes de generar ambigüedad. Pendiente confirmar si existe algún caso con stock real en ambos lados (TC-09).</p>`,
           code: `SI todos los U_ARGNS_COL del modelo vienen vacíos:
     productOptions = [Talla]
 SINO:
